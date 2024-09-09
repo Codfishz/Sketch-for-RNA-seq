@@ -16,10 +16,10 @@ Isoform Assignment: Reads are assigned to isoforms using gene annotation from GT
 Isoform Expression Estimation: Isoform expression levels are calculated using the EM algorithm, with output in TPM.
 Installation
 Clone the repository:
-'''bash
+、、、bash
 git clone https://github.com/your-username/rna-seq-isoform-quantification.git
 cd rna-seq-isoform-quantification
-'''
+、、、
 Requirements
 C++ (C++17 or newer)
 CMake
@@ -28,15 +28,17 @@ SeqAn (for efficient sequence handling)
 MurmurHash (for hashing k-mers)
 Build Instructions
 
-'''bash
+、、、bash
 mkdir build && cd build
 cmake ..
 make
+、、、
 Usage
 Run the tool with the following command:
 
-'''bash
+、、、bash
 ./isoform_quantify -t 4 -m 2048 -k 31 -w 100 reference.fasta reads.fastq annotations.gtf output.csv
+、、、
 Options:
 
 -t: Number of threads to use.
