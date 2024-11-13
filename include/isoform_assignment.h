@@ -10,7 +10,7 @@
 
 
 std::unordered_map<std::string, int> assign_reads_to_isoforms(
-    const std::unordered_map<std::string, std::pair<std::string, int>>& homologous_segments,
+    const std::unordered_map<std::string, std::string>& homologous_segments,
     const std::unordered_map<std::string, Transcript>& transcripts);
 
 

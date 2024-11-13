@@ -5,27 +5,24 @@
 #include <stdexcept>
 #include <unordered_map>
 
-
-
-
 // 从稀疏链比对结果中分配 reads 到 isoforms
 
 std::unordered_map<std::string, int> assign_reads_to_isoforms(
-    const std::unordered_map<std::string, std::pair<std::string, int>>& homologous_segments,
+    const std::unordered_map<std::string, std::string>& homologous_segments,
     const std::unordered_map<std::string, Transcript>& transcripts) {
 
     std::unordered_map<std::string, int> read_counts;
 
-    for (const auto& [read_id, best_match] : homologous_segments) {
-        const auto& [transcript_id, match_count] = best_match;
+    for (const auto& [read_id, transcript_id] : homologous_segments) {
+        // 检查该转录本是否存在于 transcripts 中
         if (transcripts.find(transcript_id) != transcripts.end()) {
-            read_counts[transcript_id] += match_count;  // 累加匹配到的reads数量
+            // 累加每个转录本的 reads 数量
+            read_counts[transcript_id] += 1;
         }
     }
 
     return read_counts;
 }
-
 
 // 计算TPM
 std::unordered_map<std::string, double> calculate_tpm(

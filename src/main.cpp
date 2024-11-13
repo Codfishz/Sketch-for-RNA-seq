@@ -34,7 +34,7 @@ int main(int argc, char* argv[]) {
     // 默认参数值
     int threads = 1;
     int memory = 1024; // 以MB为单位
-    int kmer_length = 31;
+    int kmer_length = 17;
     int window_size = 100;
 
     // 处理命令行选项
@@ -102,7 +102,7 @@ int main(int argc, char* argv[]) {
             }
 
             auto hashed_kmers = extract_and_hash_kmers(transcript.sequence, kmer_length);
-            auto sketch = createSketch_FracMinhash(hashed_kmers, 0.2);
+            auto sketch = createSketch_FracMinhash(hashed_kmers, 0.5);
             transcript_sketches[id] = sketch;
         }
 
@@ -130,7 +130,7 @@ int main(int argc, char* argv[]) {
                 continue;  // 跳过该转录本
             }
             auto hashed_kmers = extract_and_hash_kmers(read.sequence, kmer_length);
-            auto sketch = createSketch_FracMinhash(hashed_kmers, 0.2);
+            auto sketch = createSketch_FracMinhash(hashed_kmers, 0.5);
             read_sketches[id] = sketch;
         }
 
@@ -140,50 +140,27 @@ int main(int argc, char* argv[]) {
         // 输出 reads 的数量和运行时间
         std::cout << "Number of reads loaded: " << reads.size() << std::endl;
         std::cout << "Time taken to load and process reads: " << elapsed.count() << " seconds." << std::endl;
-   
-        //构建sparse chain
-        // start = std::chrono::high_resolution_clock::now();
-        // std::vector<std::vector<std::pair<int, int>>> all_homologous_segments;
-        // for (size_t i = 0; i < read_sketches.size(); ++i) {        
-        //     for (size_t j = 0; j < transcript_sketches.size(); ++j) {
-        //         if(j%5000==0){
-        //             std::cout<<j<<std::endl;
-        //         }   
-        //         auto homologous_segments = sparse_chain(read_sketches[i], transcript_sketches[j]);
-        //         all_homologous_segments.push_back(homologous_segments);
-        //         // std::cout << "Read " << i << " and Transcript " << j << " homologous segments:" << std::endl;
-        //         // for (const auto& segment : homologous_segments) {
-        //         //     std::cout << "Reference position: " << segment.first << ", Read position: " << segment.second << std::endl;
-        //         // }
-        //     }
-        // }
-        // end = std::chrono::high_resolution_clock::now();
-        // elapsed = end - start;
-        // std::cout << "Time taken for sparse chaining: " << elapsed.count() << " seconds." << std::endl;
-        // std::cout << "All homologous segments found:" << std::endl;
-        // for (size_t i = 0; i < all_homologous_segments.size(); ++i) {
-        //     std::cout << "For Read " << i << ":" << std::endl;
-        //     for (const auto& segment : all_homologous_segments[i]) {
-        //         std::cout << "Reference position: " << segment.first << ", Read position: " << segment.second << std::endl;
-        //     }
-        // }
-        // end = std::chrono::high_resolution_clock::now();
-        // elapsed = end - start;
-        // std::cout << "Time taken for sparse chaining: " << elapsed.count() << " seconds." << std::endl;
+
+        size_t num_reads = read_sketches.size();
+        std::cout<<"Number of reads sketch:" <<num_reads<<std::endl;
+
+
         start = std::chrono::high_resolution_clock::now();
 
-        auto homologous_segments = sparse_chain(read_sketches, kmer_to_transcripts);
+        auto homologous_segments = sparse_chain(read_sketches, kmer_to_transcripts,transcripts);
+        
         std::cout << "Total number of successful matches: " << homologous_segments.size() << std::endl;
         std::cout<<"finish sparse chain"<<std::endl;
+
         // 输出匹配结果
         // count =0;
-        // for (const auto& [read_id, match] : homologous_segments) {
-        //     const std::string& transcript_id = match.first;
-        //     int match_count = match.second;
 
-        //     std::cout << "Read ID: " << read_id << " best matches with Transcript ID: " 
-        //             << transcript_id << " with " << match_count << " matching k-mers." << std::endl;
+        // 遍历并打印 homologous_segments 的内容
+        // for (const auto& [read_id, transcript_id] : homologous_segments) {
+        //     std::cout << read_id << " -> " << transcript_id << std::endl;
         // }
+        return 0;
+
         end = std::chrono::high_resolution_clock::now();
         elapsed = end - start;
         std::cout << "Time taken to create sparse chain: " << elapsed.count() << " seconds." << std::endl;
