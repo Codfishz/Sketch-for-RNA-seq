@@ -27,7 +27,7 @@ bool is_valid_sequence(const std::string& sequence) {
     return true;
 }
 
-// 读取FASTA文件
+// Read FASTA
 std::unordered_map<std::string, Transcript> load_fasta(const std::string& fasta_file) {
     std::unordered_map<std::string, Transcript> transcripts;
     std::ifstream infile(fasta_file, std::ios::in | std::ios::binary);
@@ -38,24 +38,22 @@ std::unordered_map<std::string, Transcript> load_fasta(const std::string& fasta_
     std::string line, sequence;
     std::string current_id;
 
-    // 设置输入缓冲区大小（可选）
-    infile.rdbuf()->pubsetbuf(nullptr, 1 << 20); // 设置 1MB 的缓冲区
+    infile.rdbuf()->pubsetbuf(nullptr, 1 << 20); // 
 
     while (std::getline(infile, line)) {
-        if (line.empty()) continue; // 跳过空行
+        if (line.empty()) continue; 
 
         if (line[0] == '>') {
             if (!current_id.empty() && is_valid_sequence(sequence)) {
                 transcripts.emplace(std::move(current_id), Transcript{current_id, std::move(sequence), static_cast<int>(sequence.size())});
             }
-            current_id = line.substr(1, line.find(' ') - 1);  // 提取 ID，去掉 '>'
+            current_id = line.substr(1, line.find(' ') - 1);  
             sequence.clear();
-            sequence.reserve(1000);  // 预留空间，减少 realloc 次数
+            sequence.reserve(1000);  
         } else {
             sequence += line;
         }
     }
-    // 处理最后一个转录本
     if (!current_id.empty()) {
         transcripts.emplace(std::move(current_id), Transcript{current_id, std::move(sequence), static_cast<int>(sequence.size())});
     }
@@ -63,7 +61,6 @@ std::unordered_map<std::string, Transcript> load_fasta(const std::string& fasta_
     return transcripts;
 }
 
-// 读取FASTQ文件并返回一个hash table
 std::unordered_map<std::string, Read> load_fastq(const std::string& fastq_file) {
     int count = 0;
     std::unordered_map<std::string, Read> reads;
@@ -73,15 +70,15 @@ std::unordered_map<std::string, Read> load_fastq(const std::string& fastq_file) 
     }
     std::string line;
     while (std::getline(infile, line)) {
-        if (line.empty() || line[0] != '@') continue; // 跳过无效行
+        if (line.empty() || line[0] != '@') continue; 
         Read read;
-        read.id = line.substr(1);  // 提取 read ID
+        read.id = line.substr(1);  
         std::getline(infile, read.sequence);
-        std::getline(infile, line); // 跳过 '+'
+        std::getline(infile, line); 
         std::getline(infile, read.quality);
         count++;
         if (is_valid_sequence(read.sequence)) {
-            reads[read.id] = read;  // 将合法的 read 存入 hash table
+            reads[read.id] = read;  
         } 
     }
     std::cout<<"Actual number of reads: "<<count<<std::endl;
@@ -97,10 +94,8 @@ void output_to_csv(const std::string& filename,
         throw std::runtime_error("Could not open file for writing: " + filename);
     }
 
-    // 写入文件头
     outfile << "Name,Length,EffectiveLength,TPM,NumReads\n";
 
-    // 写入每个转录本的统计信息
     for (const auto& [id, transcript] : transcripts) {
         auto read_count_it = read_counts.find(id);
         auto tpm_it = tpms.find(id);
@@ -109,7 +104,7 @@ void output_to_csv(const std::string& filename,
             int read_count = read_count_it->second;
             double tpm = tpm_it->second;
             outfile << id << "," << transcript.length << "," 
-                    << transcript.length << "," // 假设 EffectiveLength 和 Length 相同
+                    << transcript.length << "," // 
                     << tpm << "," << read_count << "\n";
         } 
     }
@@ -117,11 +112,10 @@ void output_to_csv(const std::string& filename,
     outfile.close();
 }
 
-// // 质量控制函数：过滤掉低质量的reads
 // std::vector<Read> quality_control(const std::vector<Read>& reads) {
 //     std::vector<Read> filtered_reads;
-//     const int min_quality = 20; // 设置最小质量分数
-//     const int min_length = 50;  // 设置最小read长度
+//     const int min_quality = 20; 
+//     const int min_length = 50;  
 
 //     for (const auto& read : reads) {
 //         bool pass = true;

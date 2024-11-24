@@ -26,13 +26,13 @@ std::vector<uint32_t> createSketch_bottomk(const std::vector<uint32_t>& hashed_k
     return min_k_hashes;
 }
 // std::vector<uint32_t> createSketch_Minhash(const std::vector<std::string>& kmers, int num_hashes) {
-//     // 使用先前的函数生成每个k-mer的多个哈希值
+//     
 //     std::vector<std::vector<uint32_t>> hashes = mutil_hash_kmers(kmers, num_hashes);
 
-//     // 存储每个哈希函数的最小值
+//    
 //     std::vector<uint32_t> min_hashes(num_hashes, std::numeric_limits<uint32_t>::max());
 
-//     // 遍历所有哈希值，更新每个哈希函数的最小值
+//   
 //     for (const auto& kmer_hashes : hashes) {
 //         for (int i = 0; i < num_hashes; ++i) {
 //             if (kmer_hashes[i] < min_hashes[i]) {
@@ -49,16 +49,13 @@ std::vector<uint32_t> createSketch_Minimizer(const std::vector<uint32_t>& hashed
     }
     std::vector<uint32_t> minimizers;
 
-    // 遍历所有可能的窗口
     for (size_t i = 0; i <= hashed_kmers.size() - window_size; ++i) {
-        // 找到窗口中的最小哈希值
         uint32_t min_hash = std::numeric_limits<uint32_t>::max();
         for (size_t j = i; j < i + window_size; ++j) {
             if (hashed_kmers[j] < min_hash) {
                 min_hash = hashed_kmers[j];
             }
         }
-        // 只添加新minimizer（避免重复）
         if (minimizers.empty() || minimizers.back() != min_hash) {
             minimizers.push_back(min_hash);
         }
@@ -67,19 +64,19 @@ std::vector<uint32_t> createSketch_Minimizer(const std::vector<uint32_t>& hashed
     return minimizers;
 }
 
-// 创建FracMinhash Sketch的函数
+// 
 // std::vector<uint32_t> createSketch_FracMinhash(const std::vector<uint32_t>& hashed_kmers, double fraction) {
 //     if (fraction <= 0.0 || fraction > 1.0) {
 //         throw std::invalid_argument("Fraction must be between 0 and 1");
 //     }
 
-//     // 确定H的值为uint32_t的最大值
+//    
 //     const uint32_t H = std::numeric_limits<uint32_t>::max();
 //     const uint32_t threshold = static_cast<uint32_t>(H * fraction);
 
 //     std::vector<uint32_t> fracminhash;
 
-//     // 选择小于等于H/s的哈希值
+//    
 //     for (const auto& hash : hashed_kmers) {
 //         if (hash <= threshold) {
 //             fracminhash.push_back(hash);
@@ -100,7 +97,7 @@ std::unordered_set<uint32_t> createSketch_FracMinhash(const std::unordered_set<u
 
     for (const auto& hash : hashed_kmers) {
         if (hash <= threshold) {
-            fracminhash.insert(hash);  // 插入符合条件的哈希值
+            fracminhash.insert(hash); 
         }
     }
 
@@ -114,10 +111,29 @@ std::unordered_map<uint32_t, std::vector<std::pair<std::string, const std::unord
 
     for (const auto& [transcript_id, sketch] : transcript_sketches) {
         for (const auto& kmer : sketch) {
-            // 存储 transcript_id 和指向 sketch 的指针
             kmer_to_transcripts[kmer].emplace_back(transcript_id, &sketch);
         }
     }
 
     return kmer_to_transcripts;
+}
+
+// Function to create an ordered MinHash sketch
+std::vector<std::pair<uint32_t, size_t>> createSketch_OrderedMinhash(const std::vector<std::pair<uint32_t, size_t>>& hashed_kmers, double fraction) {
+    if (fraction <= 0.0 || fraction > 1.0) {
+        throw std::invalid_argument("Fraction must be between 0 and 1");
+    }
+
+    const size_t total_hashes = hashed_kmers.size();
+    const size_t num_to_select = static_cast<size_t>(total_hashes * fraction);
+
+    // Copy and sort by hash value to select minimum hashes in the original order
+    std::vector<std::pair<uint32_t, size_t>> sorted_hashed_kmers = hashed_kmers;
+    std::partial_sort(sorted_hashed_kmers.begin(), sorted_hashed_kmers.begin() + num_to_select, sorted_hashed_kmers.end(),
+                      [](const auto& a, const auto& b) { return a.first < b.first; });
+
+    // Collect the selected hashes along with their original position
+    std::vector<std::pair<uint32_t, size_t>> ordered_minhash(sorted_hashed_kmers.begin(), sorted_hashed_kmers.begin() + num_to_select);
+
+    return ordered_minhash;
 }

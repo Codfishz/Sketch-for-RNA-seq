@@ -12,7 +12,6 @@
 #include <chrono>
 #include <unordered_map> 
 //
-//帮助函数
 void print_help(const std::string& program_name) {
     std::cout << "Usage: " << program_name << " [OPTIONS] <reference_genome.fasta> <reads.fastq>" << std::endl;
     std::cout << "Options:" << std::endl;
@@ -31,13 +30,11 @@ void print_help(const std::string& program_name) {
 }
 
 int main(int argc, char* argv[]) {
-    // 默认参数值
     int threads = 1;
     int memory = 1024; // 以MB为单位
-    int kmer_length = 17;
+    int kmer_length = 31;
     int window_size = 100;
 
-    // 处理命令行选项
     static struct option long_options[] = {
         {"help", no_argument, 0, 'h'},
         {"threads", required_argument, 0, 't'},
@@ -85,24 +82,22 @@ int main(int argc, char* argv[]) {
     try {
         auto start = std::chrono::high_resolution_clock::now();
 
-        // 解析 GTF 文件，加载转录本和注释信息
         // auto annotations_map = parse_gtf(annotation_path);
         // std::unordered_map<std::string, Transcript> transcripts = load_transcripts_with_annotations(reference_genome_path, annotations_map);
         std::unordered_map<std::string, Transcript> transcripts = load_fasta(reference_genome_path);
 
         int count = 0;
 
-        // 创建转录本的 sketches
         std::unordered_map<std::string, std::unordered_set<uint32_t>> transcript_sketches;
         for (const auto& [id, transcript] : transcripts) {
             if (transcript.sequence.length() < kmer_length) {
                 // std::cerr << "Skipping transcript " << id << " because its length (" << transcript.sequence.length() 
                 //         << ") is less than kmer-length (" << kmer_length << ")." << std::endl;
-                continue;  // 跳过该转录本
+                continue; 
             }
 
-            auto hashed_kmers = extract_and_hash_kmers(transcript.sequence, kmer_length);
-            auto sketch = createSketch_FracMinhash(hashed_kmers, 0.5);
+            auto hashed_kmers = extract_and_hash_kmers_murmur(transcript.sequence, kmer_length,67890);
+            auto sketch = createSketch_FracMinhash(hashed_kmers, 0.2);
             transcript_sketches[id] = sketch;
         }
 
@@ -111,33 +106,28 @@ int main(int argc, char* argv[]) {
         auto end = std::chrono::high_resolution_clock::now();
         std::chrono::duration<double> elapsed = end - start;
 
-        // 输出转录本的数量和运行时间
         std::cout << "Number of transcripts loaded: " << transcripts.size() << std::endl;
         std::cout << "Time taken to load and process transcripts: " << elapsed.count() << " seconds." << std::endl;
 
         start = std::chrono::high_resolution_clock::now();
 
-        // 加载 reads
         std::unordered_map<std::string, Read> reads = load_fastq(reads_path);
         
         count = 0;
-        // 创建 reads 的 sketches
         std::unordered_map<std::string, std::unordered_set<uint32_t>> read_sketches;
         for (const auto& [id, read] : reads) {
             if (read.sequence.length() < kmer_length) {
                 // std::cerr << "Skipping read " << id << " because its length (" << read.sequence.length() 
                 //         << ") is less than kmer-length (" << kmer_length << ")." << std::endl;
-                continue;  // 跳过该转录本
+                continue; 
             }
-            auto hashed_kmers = extract_and_hash_kmers(read.sequence, kmer_length);
-            auto sketch = createSketch_FracMinhash(hashed_kmers, 0.5);
+            auto hashed_kmers = extract_and_hash_kmers_murmur(read.sequence, kmer_length, 67890);
+            auto sketch = createSketch_FracMinhash(hashed_kmers, 0.2);
             read_sketches[id] = sketch;
         }
 
         end = std::chrono::high_resolution_clock::now();
         elapsed = end - start;
-
-        // 输出 reads 的数量和运行时间
         std::cout << "Number of reads loaded: " << reads.size() << std::endl;
         std::cout << "Time taken to load and process reads: " << elapsed.count() << " seconds." << std::endl;
 
@@ -147,29 +137,24 @@ int main(int argc, char* argv[]) {
 
         start = std::chrono::high_resolution_clock::now();
 
-        auto homologous_segments = sparse_chain(read_sketches, kmer_to_transcripts,transcripts);
+        auto homologous_segments = sparse_chain(read_sketches, kmer_to_transcripts, transcripts, reads, kmer_length, 0.3);
         
         std::cout << "Total number of successful matches: " << homologous_segments.size() << std::endl;
         std::cout<<"finish sparse chain"<<std::endl;
 
-        // 输出匹配结果
         // count =0;
 
-        // 遍历并打印 homologous_segments 的内容
         // for (const auto& [read_id, transcript_id] : homologous_segments) {
         //     std::cout << read_id << " -> " << transcript_id << std::endl;
         // }
-        return 0;
 
         end = std::chrono::high_resolution_clock::now();
         elapsed = end - start;
         std::cout << "Time taken to create sparse chain: " << elapsed.count() << " seconds." << std::endl;
 
 
-        // 分配reads给 isoforms 和计算TPM
         start = std::chrono::high_resolution_clock::now();
 
-        // 假设 `transcripts` 已经包含了加载好的 `Transcript` 结构体
         std::unordered_map<std::string, int> read_counts = assign_reads_to_isoforms(homologous_segments, transcripts);
 
         end = std::chrono::high_resolution_clock::now();
@@ -184,12 +169,12 @@ int main(int argc, char* argv[]) {
         elapsed = end - start;
         std::cout << "Time taken to calculate TPM: " << elapsed.count() << " seconds." << std::endl;
 
-        //输出TPM结果
         // for (const auto& [transcript_id, tpm_value] : tpm) {
         //     std::cout << "Transcript " << transcript_id << " has TPM " << tpm_value << std::endl;
         // }
 
         output_to_csv(output_path, read_counts, tpm, transcripts);
+        std::cout <<"output finish" << std::endl;
 
     } catch (const std::runtime_error& e) {
         std::cerr << "Error: " << e.what() << std::endl;
