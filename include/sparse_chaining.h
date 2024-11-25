@@ -14,17 +14,18 @@
 
 // 稀疏链比对函数声明
 
-std::unordered_map<std::string, std::string> sparse_chain(
+std::unordered_map<std::string, std::vector<std::string>> sparse_chain(
     const std::unordered_map<std::string, std::unordered_set<uint32_t>>& read_sketches,
     const std::unordered_map<uint32_t, std::vector<std::pair<std::string, const std::unordered_set<uint32_t>*>>>& kmer_to_transcripts,
     const std::unordered_map<std::string, Transcript>& transcripts,
     const std::unordered_map<std::string, Read>& reads,
     int kmer_length, double fraction) ;
-std::string find_best_match_orderedminhash(const std::string& read_id,
-                                           const std::unordered_map<std::string, Read>& reads,
-                                           const std::vector<std::string>& candidate_transcripts,
-                                           const std::unordered_map<std::string, Transcript>& transcripts,
-                                           int kmer_length, double fraction);
+std::vector<std::string> find_best_match_orderedminhash(const std::string& read_id,
+                                                        const std::unordered_map<std::string, Read>& reads,
+                                                        const std::vector<std::string>& candidate_transcripts,
+                                                        const std::unordered_map<std::string, Transcript>& transcripts,
+                                                        int kmer_length, double fraction);
 double compare_relative_positions(const std::vector<std::pair<uint32_t, size_t>>& read_minhash,
                                   const std::vector<std::pair<uint32_t, size_t>>& transcript_minhash);
+int edit_distance(const std::string& str1, const std::string& str2);
 #endif // SPARSE_CHAINING_H
