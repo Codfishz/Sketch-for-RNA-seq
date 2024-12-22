@@ -53,12 +53,17 @@ std::unordered_map<std::string, std::vector<std::string>> sparse_chain(
                 candidate_transcripts.push_back(transcript_id);
             }
         }
-        if (!candidate_transcripts.empty()) {
-            auto best_transcript_ids = find_best_match_orderedminhash(read_id, reads, candidate_transcripts, transcripts, kmer_length, fraction);
-            if (!best_transcript_ids.empty()) {
-                homologous_segments[read_id] = best_transcript_ids;
-            }
+        std::cout<<"Read:"<<read_id<<std::endl;
+        for (size_t i = 0; i < candidate_transcripts.size(); ++i) {
+            std::cout << candidate_transcripts[i] << std::endl;
         }
+        homologous_segments[read_id]= candidate_transcripts;
+        // if (!candidate_transcripts.empty()) {
+        //     auto best_transcript_ids = find_best_match_orderedminhash(read_id, reads, candidate_transcripts, transcripts, kmer_length, fraction);
+        //     if (!best_transcript_ids.empty()) {
+        //         homologous_segments[read_id] = best_transcript_ids;
+        //     }
+        // }
     }
 
     return homologous_segments;
