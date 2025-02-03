@@ -19,14 +19,15 @@
 #include <chrono>
 #include <fstream>
 // Function to perform sparse chaining
-std::unordered_map<std::string, std::vector<std::string>> sparse_chain(
+std::unordered_map<std::string, std::vector<std::pair<std::string, int>>> sparse_chain(
     const std::unordered_map<std::string, std::unordered_set<uint32_t>>& read_sketches,
     const std::unordered_map<uint32_t, std::vector<std::pair<std::string, const std::unordered_set<uint32_t>*>>>& kmer_to_transcripts,
     const std::unordered_map<std::string, Transcript>& transcripts,
     const std::unordered_map<std::string, Read>& reads,
     int kmer_length, double fraction) {
 
-    std::unordered_map<std::string, std::vector<std::string>> homologous_segments;
+    std::unordered_map<std::string, std::vector<std::pair<std::string, int>>> homologous_segments;
+
     for (const auto& [read_id, read_sketch] : read_sketches) {
         std::unordered_map<std::string, int> transcript_match_counts;
 
@@ -38,36 +39,21 @@ std::unordered_map<std::string, std::vector<std::string>> sparse_chain(
             }
         }
 
-        std::vector<std::string> candidate_transcripts;
-        int max_match_count = 0;
+        // 将 match_count 结果存储为候选列表
+        std::vector<std::pair<std::string, int>> candidate_transcripts;
         for (const auto& [transcript_id, match_count] : transcript_match_counts) {
-            if (transcripts.find(transcript_id) == transcripts.end()) {
-                std::cerr << "Warning: Transcript ID not found: " << transcript_id << std::endl;
-                continue;
-            }
-            if (match_count > max_match_count) {
-                max_match_count = match_count;
-                candidate_transcripts.clear();
-                candidate_transcripts.push_back(transcript_id);
-            } else if (match_count == max_match_count) {
-                candidate_transcripts.push_back(transcript_id);
+            if (transcripts.find(transcript_id) != transcripts.end()) {
+                candidate_transcripts.emplace_back(transcript_id, match_count);
             }
         }
-        std::cout<<"Read:"<<read_id<<std::endl;
-        for (size_t i = 0; i < candidate_transcripts.size(); ++i) {
-            std::cout << candidate_transcripts[i] << std::endl;
-        }
-        homologous_segments[read_id]= candidate_transcripts;
-        // if (!candidate_transcripts.empty()) {
-        //     auto best_transcript_ids = find_best_match_orderedminhash(read_id, reads, candidate_transcripts, transcripts, kmer_length, fraction);
-        //     if (!best_transcript_ids.empty()) {
-        //         homologous_segments[read_id] = best_transcript_ids;
-        //     }
-        // }
+
+        homologous_segments[read_id] = candidate_transcripts;
     }
 
     return homologous_segments;
 }
+
+
 
 // Function to find the best matching transcripts using Ordered MinHash for candidates
 std::vector<std::string> find_best_match_orderedminhash(const std::string& read_id,

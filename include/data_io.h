@@ -42,9 +42,10 @@ struct Read {
 std::unordered_map<std::string, Transcript> load_fasta(const std::string& fasta_file); 
 std::unordered_map<std::string, Read> load_fastq(const std::string& fastq_file);
 void output_to_csv(const std::string& filename, 
-                   const std::unordered_map<std::string, int>& read_counts,
+                   const std::unordered_map<std::string, double>& read_counts,
                    const std::unordered_map<std::string, double>& tpms,
-                   const std::unordered_map<std::string, Transcript>& transcripts) ;
+                   const std::unordered_map<std::string, double>& pi,
+                   const std::unordered_map<std::string, Transcript>& transcripts)  ;
 
 // std::vector<Read> quality_control(const std::vector<Read>& reads);
 

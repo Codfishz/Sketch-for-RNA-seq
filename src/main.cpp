@@ -34,6 +34,7 @@ int main(int argc, char* argv[]) {
     int memory = 1024; // 以MB为单位
     int kmer_length = 31;
     int window_size = 100;
+    float sketch_size = 0.2;
 
     static struct option long_options[] = {
         {"help", no_argument, 0, 'h'},
@@ -97,7 +98,7 @@ int main(int argc, char* argv[]) {
             }
 
             auto hashed_kmers = extract_and_hash_kmers_murmur(transcript.sequence, kmer_length,67890);
-            auto sketch = createSketch_FracMinhash(hashed_kmers, 0.2);
+            auto sketch = createSketch_FracMinhash(hashed_kmers, sketch_size);
             transcript_sketches[id] = sketch;
         }
 
@@ -122,7 +123,7 @@ int main(int argc, char* argv[]) {
                 continue; 
             }
             auto hashed_kmers = extract_and_hash_kmers_murmur(read.sequence, kmer_length, 67890);
-            auto sketch = createSketch_FracMinhash(hashed_kmers, 0.2);
+            auto sketch = createSketch_FracMinhash(hashed_kmers, sketch_size);
             read_sketches[id] = sketch;
         }
 
@@ -154,8 +155,15 @@ int main(int argc, char* argv[]) {
 
 
         start = std::chrono::high_resolution_clock::now();
+        auto pi = estimate_isoform_abundance_em(homologous_segments, transcripts, 20, 0.01);
 
-        std::unordered_map<std::string, int> read_counts = assign_reads_to_isoforms(homologous_segments, transcripts);
+        end = std::chrono::high_resolution_clock::now();
+        elapsed = end - start;
+        std::cout << "Time taken for em estimation: " << elapsed.count() << " seconds." << std::endl;
+        
+        start = std::chrono::high_resolution_clock::now();
+
+        std::unordered_map<std::string, double> read_counts = assign_reads_to_isoforms(homologous_segments, pi, transcripts);
 
         end = std::chrono::high_resolution_clock::now();
         elapsed = end - start;
@@ -165,6 +173,7 @@ int main(int argc, char* argv[]) {
 
         std::unordered_map<std::string, double> tpm = calculate_tpm(read_counts, transcripts);
 
+
         end = std::chrono::high_resolution_clock::now();
         elapsed = end - start;
         std::cout << "Time taken to calculate TPM: " << elapsed.count() << " seconds." << std::endl;
@@ -172,9 +181,14 @@ int main(int argc, char* argv[]) {
         // for (const auto& [transcript_id, tpm_value] : tpm) {
         //     std::cout << "Transcript " << transcript_id << " has TPM " << tpm_value << std::endl;
         // }
+        start = std::chrono::high_resolution_clock::now();
 
-        output_to_csv(output_path, read_counts, tpm, transcripts);
+        output_to_csv(output_path, read_counts, tpm, pi, transcripts);
         std::cout <<"output finish" << std::endl;
+
+        end = std::chrono::high_resolution_clock::now();
+        elapsed = end - start;
+        std::cout << "Time taken to output result: " << elapsed.count() << " seconds." << std::endl;
 
     } catch (const std::runtime_error& e) {
         std::cerr << "Error: " << e.what() << std::endl;

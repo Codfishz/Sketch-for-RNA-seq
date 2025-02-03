@@ -86,31 +86,47 @@ std::unordered_map<std::string, Read> load_fastq(const std::string& fastq_file) 
 }
 
 void output_to_csv(const std::string& filename, 
-                   const std::unordered_map<std::string, int>& read_counts,
+                   const std::unordered_map<std::string, double>& read_counts,
                    const std::unordered_map<std::string, double>& tpms,
+                   const std::unordered_map<std::string, double>& pi,
                    const std::unordered_map<std::string, Transcript>& transcripts) {
     std::ofstream outfile(filename);
     if (!outfile.is_open()) {
         throw std::runtime_error("Could not open file for writing: " + filename);
     }
 
-    outfile << "Name,Length,EffectiveLength,TPM,NumReads\n";
+    // Write CSV header with additional fields for EM results
+    outfile << "Name,Length,EffectiveLength,TPM,NumReads,EM_Abundance\n";
 
+    // Loop through the transcripts and output the relevant data
     for (const auto& [id, transcript] : transcripts) {
         auto read_count_it = read_counts.find(id);
         auto tpm_it = tpms.find(id);
+        auto pi_it = pi.find(id);
 
-        if (read_count_it != read_counts.end() && tpm_it != tpms.end()) {
-            int read_count = read_count_it->second;
+        // Only output entries if read counts and TPM exist
+        if (read_count_it != read_counts.end() && tpm_it != tpms.end() && pi_it != pi.end()) {
+            double read_count = read_count_it->second;
             double tpm = tpm_it->second;
-            outfile << id << "," << transcript.length << "," 
-                    << transcript.length << "," // 
-                    << tpm << "," << read_count << "\n";
-        } 
+            double em_abundance = pi_it->second;  // EM-based abundance (pi)
+
+            // You could add a more accurate effective length calculation if available
+            double effective_length = transcript.length;  // Example placeholder
+
+            // Output data in CSV format
+            outfile << id << "," 
+                    << transcript.length << ","
+                    << effective_length << ","
+                    << tpm << ","
+                    << read_count << ","
+                    << em_abundance << "\n";
+        }
     }
 
     outfile.close();
 }
+
+
 
 // std::vector<Read> quality_control(const std::vector<Read>& reads) {
 //     std::vector<Read> filtered_reads;
