@@ -136,33 +136,70 @@ std::unordered_map<std::string, double> estimate_isoform_abundance_em(
     for (int iteration = 0; iteration < max_iterations; ++iteration) {
         auto start_iteration = std::chrono::high_resolution_clock::now();
 
+        // // E-step
+        // auto start_e_step = std::chrono::high_resolution_clock::now();
+        // std::unordered_map<std::string, double> posterior_sums;
+        // double total_change = 0.0;
+
+        // for (const auto& [read_id, candidates] : homologous_segments) {
+        //     double denominator = 0.0;
+        //     std::vector<double> numerators;
+        //     for (const auto& [transcript_id, match_count] : candidates) {
+        //         double p_r_ti = static_cast<double>(match_count);
+        //         double value = pi[transcript_id] * p_r_ti;
+        //         numerators.push_back(value);
+        //         denominator += value;
+        //     }
+
+        //     if (denominator > 0.0) {
+        //         for (size_t i = 0; i < candidates.size(); ++i) {
+        //             const std::string& transcript_id = candidates[i].first;
+        //             double posterior = numerators[i] / denominator;
+        //             posterior_sums[transcript_id] += posterior;
+        //         }
+        //     }
+        // }
+        // auto end_e_step = std::chrono::high_resolution_clock::now();
+        // std::cout << "E-step time: " 
+        //         << std::chrono::duration<double>(end_e_step - start_e_step).count() 
+        //         << " seconds" << std::endl;
         // E-step
         auto start_e_step = std::chrono::high_resolution_clock::now();
-        std::unordered_map<std::string, double> posterior_sums;
+        std::unordered_map<std::string, double> posterior_sums;  // 恢复 double
         double total_change = 0.0;
+
+        const double probability_threshold = 1e-6;  // 低概率剪枝
+        const double epsilon = 1e-10;  // 避免除零
 
         for (const auto& [read_id, candidates] : homologous_segments) {
             double denominator = 0.0;
-            std::vector<double> numerators;
+            std::vector<double> numerators(candidates.size()); // 预分配 vector，提高访问速度
+
+            // **计算分母**（直接计算，不再缓存）
+            size_t idx = 0;
             for (const auto& [transcript_id, match_count] : candidates) {
                 double p_r_ti = static_cast<double>(match_count);
                 double value = pi[transcript_id] * p_r_ti;
-                numerators.push_back(value);
+                numerators[idx++] = value;  // 存入 vector，避免额外查找
                 denominator += value;
             }
 
-            if (denominator > 0.0) {
-                for (size_t i = 0; i < candidates.size(); ++i) {
-                    const std::string& transcript_id = candidates[i].first;
-                    double posterior = numerators[i] / denominator;
+            if (denominator > epsilon) {
+                double inv_denominator = 1.0 / denominator;  // 预计算倒数，加速除法
+                idx = 0;
+                for (const auto& [transcript_id, match_count] : candidates) {
+                    double posterior = numerators[idx++] * inv_denominator;
                     posterior_sums[transcript_id] += posterior;
                 }
             }
         }
+
         auto end_e_step = std::chrono::high_resolution_clock::now();
-        std::cout << "E-step time: " 
-                << std::chrono::duration<double>(end_e_step - start_e_step).count() 
-                << " seconds" << std::endl;
+        // std::cout << "E-step time: " 
+        //         << std::chrono::duration<double>(end_e_step - start_e_step).count() 
+        //         << " seconds" << std::endl;
+
+
 
         // M-step
         float pseudocount = 0.01;
@@ -174,14 +211,14 @@ std::unordered_map<std::string, double> estimate_isoform_abundance_em(
             pi[transcript_id] = new_pi;
         }
         auto end_m_step = std::chrono::high_resolution_clock::now();
-        std::cout << "M-step time: " 
-                << std::chrono::duration<double>(end_m_step - start_m_step).count() 
-                << " seconds" << std::endl;
+        // std::cout << "M-step time: " 
+        //         << std::chrono::duration<double>(end_m_step - start_m_step).count() 
+        //         << " seconds" << std::endl;
 
         auto end_iteration = std::chrono::high_resolution_clock::now();
-        std::cout << "Iteration " << iteration << " time: " 
-                << std::chrono::duration<double>(end_iteration - start_iteration).count() 
-                << " seconds" << std::endl;
+        // std::cout << "Iteration " << iteration << " time: " 
+        //         << std::chrono::duration<double>(end_iteration - start_iteration).count() 
+        //         << " seconds" << std::endl;
 
         if (total_change < convergence_threshold) {
             break;
