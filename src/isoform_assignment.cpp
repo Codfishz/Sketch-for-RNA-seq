@@ -122,7 +122,6 @@ std::unordered_map<std::string, double> estimate_isoform_abundance_em(
 
     // Uniform distribution 初始化
     auto start_uniform = std::chrono::high_resolution_clock::now();
-    // 原代码
     std::unordered_map<std::string, double> pi;
     for (const auto& [transcript_id, _] : transcripts) {
         pi[transcript_id] = 1.0 / transcripts.size();

@@ -19,81 +19,87 @@
 #include <chrono>
 #include <fstream>
 // Function to perform sparse chaining
-std::unordered_map<std::string, std::vector<std::pair<std::string, int>>> sparse_chain(
+std::unordered_map<std::string, std::vector<std::pair<std::string, int>>>
+sparse_chain(
     const std::unordered_map<std::string, MultiKmerSketch>& read_sketches,
-    const std::pair<
-        std::unordered_map<uint32_t, std::vector<std::pair<std::string, const std::unordered_set<uint32_t>*>>>,
-        std::unordered_map<uint32_t, std::vector<std::pair<std::string, const std::unordered_set<uint32_t>*>>>
-    >& kmer_to_transcripts_pair,
+    // 新的 mapping，key 为 kmer length
+    const std::unordered_map<unsigned, 
+           std::unordered_map<uint32_t, std::vector<std::pair<std::string, const std::unordered_set<uint32_t>*>>>>& kmer_to_transcripts,
     const std::unordered_map<std::string, Transcript>& transcripts,
     const std::unordered_map<std::string, Read>& reads,
-    int kmer_length, double fraction)
+    const std::vector<unsigned>& kmer_lengths, 
+    double fraction)
 {
-    // 分别取出两个 mapping：一个对应 sketch1，一个对应 sketch2
-    const auto& kmer_to_transcripts1 = kmer_to_transcripts_pair.first;
-    const auto& kmer_to_transcripts2 = kmer_to_transcripts_pair.second;
-
     std::unordered_map<std::string, std::vector<std::pair<std::string, int>>> homologous_segments;
 
-    // 针对每个 read
+    // 遍历每个 read
     for (const auto& [read_id, multi_sketch] : read_sketches) {
-        std::unordered_map<std::string, int> match_counts1; // kmer1 匹配计数
-        std::unordered_map<std::string, int> match_counts2; // kmer2 匹配计数
+        // 为每个 transcript，在不同 kmer length 上分别统计匹配数。
+        // 使用 map: transcript_id -> vector<int>，其中 vector 的下标对应 kmer_lengths 中的顺序
+        std::unordered_map<std::string, std::vector<int>> match_counts;
+        // 初始化 match_counts 时不必预先分配，后面遇到时再填充。
 
-        // 对 read 的 sketch1 中的 kmer 进行匹配
-        for (const auto& kmer : multi_sketch.sketch1) {
-            auto it = kmer_to_transcripts1.find(kmer);
-            if (it != kmer_to_transcripts1.end()) {
-                for (const auto& [transcript_id, transcript_sketch_ptr] : it->second) {
-                    match_counts1[transcript_id]++;
+        // 针对每个 kmer length，依次统计匹配数
+        for (size_t i = 0; i < kmer_lengths.size(); i++) {
+            unsigned k = kmer_lengths[i];
+            // 从全局 mapping 中获取当前 k 的 mapping
+            auto map_it = kmer_to_transcripts.find(k);
+            if (map_it == kmer_to_transcripts.end())
+                continue;
+            const auto& current_mapping = map_it->second;
+            // 从 read 的 multi_sketch 中获取对应 k 的 sketch
+            auto sketch_it = multi_sketch.sketches.find(k);
+            if (sketch_it == multi_sketch.sketches.end())
+                continue;
+            const auto& sketch = sketch_it->second;
+            // 遍历当前 sketch 中的每个 kmer
+            for (const auto& kmer : sketch) {
+                auto it = current_mapping.find(kmer);
+                if (it != current_mapping.end()) {
+                    for (const auto& [transcript_id, transcript_sketch_ptr] : it->second) {
+                        // 若 transcript_id 不在 match_counts 中，初始化一个与 kmer_lengths.size() 等长的 vector
+                        if (match_counts.find(transcript_id) == match_counts.end()) {
+                            match_counts[transcript_id] = std::vector<int>(kmer_lengths.size(), 0);
+                        }
+                        match_counts[transcript_id][i]++;  // 在第 i 个 kmer length 上计数
+                    }
                 }
             }
         }
 
-        // 对 read 的 sketch2 中的 kmer 进行匹配
-        for (const auto& kmer : multi_sketch.sketch2) {
-            auto it = kmer_to_transcripts2.find(kmer);
-            if (it != kmer_to_transcripts2.end()) {
-                for (const auto& [transcript_id, transcript_sketch_ptr] : it->second) {
-                    match_counts2[transcript_id]++;
-                }
+        // 对于每个 transcript，分别计算每个 kmer length 的最大匹配数（仅在当前 read 内部）
+        std::vector<int> max_counts(kmer_lengths.size(), 0);
+        for (const auto& [transcript_id, counts_vec] : match_counts) {
+            for (size_t i = 0; i < counts_vec.size(); i++) {
+                if (counts_vec[i] > max_counts[i])
+                    max_counts[i] = counts_vec[i];
             }
         }
-
-        // 分别计算两侧的最大匹配数
-        int max_count1 = 0;
-        for (const auto& kv : match_counts1) {
-            if (kv.second > max_count1) {
-                max_count1 = kv.second;
-            }
-        }
-        int max_count2 = 0;
-        for (const auto& kv : match_counts2) {
-            if (kv.second > max_count2) {
-                max_count2 = kv.second;
-            }
+        // 计算每个 kmer length 的阈值
+        std::vector<double> thresholds(kmer_lengths.size(), 0.0);
+        for (size_t i = 0; i < max_counts.size(); i++) {
+            thresholds[i] = fraction * max_counts[i];
         }
 
-        // 计算两侧的阈值
-        double threshold1 = 0.9 * max_count1;
-        double threshold2 = 0.9 * max_count2;
-
+        // 筛选出在所有 kmer length 上均达到阈值的 transcripts
         std::vector<std::pair<std::string, int>> candidate_transcripts;
-        // 只考虑同时在两侧都有匹配的 transcript
-        for (const auto& [transcript_id, count1] : match_counts1) {
-            auto it2 = match_counts2.find(transcript_id);
-            if (it2 != match_counts2.end()) {
-                int count2 = it2->second;
-                // 要求两侧匹配数均达到各自最大值的 90%
-                if (count1 >= threshold1 && count2 >= threshold2) {
-                    // 可以用 min(count1, count2) 或其它方式作为最终得分
-                    int final_score = std::min(count1, count2);
-                    candidate_transcripts.emplace_back(transcript_id, final_score);
+        for (const auto& [transcript_id, counts_vec] : match_counts) {
+            bool meets_all = true;
+            int final_score = 0;
+            for (size_t i = 0; i < counts_vec.size(); i++) {
+                if (counts_vec[i] < thresholds[i]) {
+                    meets_all = false;
+                    break;
                 }
+                // 这里可以根据需要选择累加、取最小值或其它方式作为最终得分
+                final_score += counts_vec[i];
+            }
+            if (meets_all) {
+                candidate_transcripts.emplace_back(transcript_id, final_score);
             }
         }
 
-        // 对候选 transcript 根据得分进行降序排序
+        // 按得分降序排序候选 transcript
         std::sort(candidate_transcripts.begin(), candidate_transcripts.end(),
                   [](const auto& a, const auto& b) { return a.second > b.second; });
 
@@ -102,6 +108,90 @@ std::unordered_map<std::string, std::vector<std::pair<std::string, int>>> sparse
 
     return homologous_segments;
 }
+
+// std::unordered_map<std::string, std::vector<std::pair<std::string, int>>> sparse_chain(
+//     const std::unordered_map<std::string, MultiKmerSketch>& read_sketches,
+//     const std::pair<
+//         std::unordered_map<uint32_t, std::vector<std::pair<std::string, const std::unordered_set<uint32_t>*>>>,
+//         std::unordered_map<uint32_t, std::vector<std::pair<std::string, const std::unordered_set<uint32_t>*>>>
+//     >& kmer_to_transcripts_pair,
+//     const std::unordered_map<std::string, Transcript>& transcripts,
+//     const std::unordered_map<std::string, Read>& reads,
+//     int kmer_length, double fraction)
+// {
+//     // 分别取出两个 mapping：一个对应 sketch1，一个对应 sketch2
+//     const auto& kmer_to_transcripts1 = kmer_to_transcripts_pair.first;
+//     const auto& kmer_to_transcripts2 = kmer_to_transcripts_pair.second;
+
+//     std::unordered_map<std::string, std::vector<std::pair<std::string, int>>> homologous_segments;
+
+//     // 针对每个 read
+//     for (const auto& [read_id, multi_sketch] : read_sketches) {
+//         std::unordered_map<std::string, int> match_counts1; // kmer1 匹配计数
+//         std::unordered_map<std::string, int> match_counts2; // kmer2 匹配计数
+
+//         // 对 read 的 sketch1 中的 kmer 进行匹配
+//         for (const auto& kmer : multi_sketch.sketch1) {
+//             auto it = kmer_to_transcripts1.find(kmer);
+//             if (it != kmer_to_transcripts1.end()) {
+//                 for (const auto& [transcript_id, transcript_sketch_ptr] : it->second) {
+//                     match_counts1[transcript_id]++;
+//                 }
+//             }
+//         }
+
+//         // 对 read 的 sketch2 中的 kmer 进行匹配
+//         for (const auto& kmer : multi_sketch.sketch2) {
+//             auto it = kmer_to_transcripts2.find(kmer);
+//             if (it != kmer_to_transcripts2.end()) {
+//                 for (const auto& [transcript_id, transcript_sketch_ptr] : it->second) {
+//                     match_counts2[transcript_id]++;
+//                 }
+//             }
+//         }
+
+//         // 分别计算两侧的最大匹配数
+//         int max_count1 = 0;
+//         for (const auto& kv : match_counts1) {
+//             if (kv.second > max_count1) {
+//                 max_count1 = kv.second;
+//             }
+//         }
+//         int max_count2 = 0;
+//         for (const auto& kv : match_counts2) {
+//             if (kv.second > max_count2) {
+//                 max_count2 = kv.second;
+//             }
+//         }
+
+//         // 计算两侧的阈值
+//         double threshold1 = 0.9 * max_count1;
+//         double threshold2 = 0.9 * max_count2;
+
+//         std::vector<std::pair<std::string, int>> candidate_transcripts;
+//         // 只考虑同时在两侧都有匹配的 transcript
+//         for (const auto& [transcript_id, count1] : match_counts1) {
+//             auto it2 = match_counts2.find(transcript_id);
+//             if (it2 != match_counts2.end()) {
+//                 int count2 = it2->second;
+//                 // 要求两侧匹配数均达到各自最大值的 90%
+//                 if (count1 >= threshold1 && count2 >= threshold2) {
+//                     // 可以用 min(count1, count2) 或其它方式作为最终得分
+//                     int final_score = std::min(count1, count2);
+//                     candidate_transcripts.emplace_back(transcript_id, final_score);
+//                 }
+//             }
+//         }
+
+//         // 对候选 transcript 根据得分进行降序排序
+//         std::sort(candidate_transcripts.begin(), candidate_transcripts.end(),
+//                   [](const auto& a, const auto& b) { return a.second > b.second; });
+
+//         homologous_segments[read_id] = candidate_transcripts;
+//     }
+
+//     return homologous_segments;
+// }
 
 // std::unordered_map<std::string, std::vector<std::pair<std::string, int>>> sparse_chain(
 //     const std::unordered_map<std::string, std::unordered_set<uint32_t>>& read_sketches,

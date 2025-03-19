@@ -123,29 +123,53 @@ std::unordered_set<uint32_t> createSketch_FracMinhash_vector(const std::vector<u
 
     return fracminhash;
 }
-
-std::pair<
-    std::unordered_map<uint32_t, std::vector<std::pair<std::string, const std::unordered_set<uint32_t>*>>>,
-    std::unordered_map<uint32_t, std::vector<std::pair<std::string, const std::unordered_set<uint32_t>*>>>
->
+std::unordered_map<unsigned, TranscriptMapping>
 build_kmer_to_transcript_map(const std::unordered_map<std::string, MultiKmerSketch>& transcript_sketches) {
-    
-    std::unordered_map<uint32_t, std::vector<std::pair<std::string, const std::unordered_set<uint32_t>*>>> kmer_to_transcripts1;
-    std::unordered_map<uint32_t, std::vector<std::pair<std::string, const std::unordered_set<uint32_t>*>>> kmer_to_transcripts2;
-    
+    // 最外层的 key 是 kmer length
+    std::unordered_map<unsigned, TranscriptMapping> kmer_to_transcripts;
+
+    // 遍历每个 transcript
     for (const auto& [transcript_id, mks] : transcript_sketches) {
-        // 针对 sketch1 构建映射
-        for (const auto& kmer : mks.sketch1) {
-            kmer_to_transcripts1[kmer].emplace_back(transcript_id, &mks.sketch1);
-        }
-        // 针对 sketch2 构建映射
-        for (const auto& kmer : mks.sketch2) {
-            kmer_to_transcripts2[kmer].emplace_back(transcript_id, &mks.sketch2);
+        // 对于每个 kmer length 的 sketch
+        for (const auto& kv : mks.sketches) {
+            unsigned k = kv.first;
+            // 获取 sketch 的引用
+            const SketchType& sketch = kv.second;
+
+            // 确保 kmer_to_transcripts 中有对应的 kmer length 映射
+            TranscriptMapping& mapping = kmer_to_transcripts[k];
+
+            // 对于 sketch 中的每个 kmer，插入 transcript 信息
+            for (const auto& kmer : sketch) {
+                mapping[kmer].emplace_back(transcript_id, &sketch);
+            }
         }
     }
-    
-    return {std::move(kmer_to_transcripts1), std::move(kmer_to_transcripts2)};
+
+    return kmer_to_transcripts;
 }
+// std::pair<
+//     std::unordered_map<uint32_t, std::vector<std::pair<std::string, const std::unordered_set<uint32_t>*>>>,
+//     std::unordered_map<uint32_t, std::vector<std::pair<std::string, const std::unordered_set<uint32_t>*>>>
+// >
+// build_kmer_to_transcript_map(const std::unordered_map<std::string, MultiKmerSketch>& transcript_sketches) {
+    
+//     std::unordered_map<uint32_t, std::vector<std::pair<std::string, const std::unordered_set<uint32_t>*>>> kmer_to_transcripts1;
+//     std::unordered_map<uint32_t, std::vector<std::pair<std::string, const std::unordered_set<uint32_t>*>>> kmer_to_transcripts2;
+    
+//     for (const auto& [transcript_id, mks] : transcript_sketches) {
+//         // 针对 sketch1 构建映射
+//         for (const auto& kmer : mks.sketch1) {
+//             kmer_to_transcripts1[kmer].emplace_back(transcript_id, &mks.sketch1);
+//         }
+//         // 针对 sketch2 构建映射
+//         for (const auto& kmer : mks.sketch2) {
+//             kmer_to_transcripts2[kmer].emplace_back(transcript_id, &mks.sketch2);
+//         }
+//     }
+    
+//     return {std::move(kmer_to_transcripts1), std::move(kmer_to_transcripts2)};
+// }
 // std::unordered_map<uint32_t, std::vector<std::pair<std::string, const std::unordered_set<uint32_t>*>>> build_kmer_to_transcript_map(
 //     const std::unordered_map<std::string, std::unordered_set<uint32_t>>& transcript_sketches) {
 

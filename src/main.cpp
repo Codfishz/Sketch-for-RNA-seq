@@ -13,7 +13,7 @@
 #include <chrono>
 #include <unordered_map> 
 #include <nthash/nthash.hpp>
-
+#include <sstream>
 
 //
 void print_help(const std::string& program_name) {
@@ -36,8 +36,9 @@ void print_help(const std::string& program_name) {
 int main(int argc, char* argv[]) {
     int threads = 1;
     int memory = 1024; // 以MB为单位
-    int kmer_length1 = 42;
-    int kmer_length2 = 63;
+    // int kmer_length1 = 42;
+    // int kmer_length2 = 63;
+    std::vector<unsigned> kmer_lengths = { 81 };
     int window_size = 100;
     float sketch_size = 0.05;
 
@@ -63,12 +64,17 @@ int main(int argc, char* argv[]) {
             case 'm':
                 memory = std::stoi(optarg);
                 break;
-            case 'k':
-                kmer_length1 = std::stoi(optarg);
-                break;
-            case 'K':
-                kmer_length2 = std::stoi(optarg);
-                break;
+                case 'k': {
+                    std::string s(optarg);
+                    std::istringstream iss(s);
+                    std::string token;
+                    while (std::getline(iss, token, ',')) {
+                        if (!token.empty()) {
+                            kmer_lengths.push_back(std::stoi(token));
+                        }
+                    }
+                    break;
+                }
             case 'w':
                 window_size = std::stoi(optarg);
                 break;
@@ -99,8 +105,15 @@ int main(int argc, char* argv[]) {
         std::unordered_map<std::string, Transcript> transcripts = load_fasta(reference_genome_path);
         std::unordered_map<std::string, MultiKmerSketch> transcript_sketches;
         for (const auto& [id, transcript] : transcripts) {
-            if (transcript.sequence.length() < kmer_length1 || transcript.sequence.length() < kmer_length2) {
-                continue; 
+            bool valid = true;
+            for (unsigned k : kmer_lengths) {
+                if (transcript.sequence.size() < k) {
+                    valid = false;
+                    break;
+                }
+            }
+            if (!valid) {
+                continue;
             }
             
             // auto hash_results = extract_hashes_with_multikmer(
@@ -116,14 +129,17 @@ int main(int argc, char* argv[]) {
             // transcript_sketches[id] = std::move(mks);
 
             MultiKmerSketch mks;
-            // auto hashed_kmers1 = extract_and_hash_kmers_murmur(transcript.sequence, kmer_length1, 67890);
-            auto hashed_kmers1 = extract_and_hash_kmers_nthash(transcript.sequence, kmer_length1);
-            mks.sketch1 = createSketch_FracMinhash(hashed_kmers1, sketch_size);
+            // // auto hashed_kmers1 = extract_and_hash_kmers_murmur(transcript.sequence, kmer_length1, 67890);
+            // auto hashed_kmers1 = extract_and_hash_kmers_nthash(transcript.sequence, kmer_length1);
+            // mks.sketch1 = createSketch_FracMinhash(hashed_kmers1, sketch_size);
 
-            // auto hashed_kmers2 = extract_and_hash_kmers_murmur(transcript.sequence, kmer_length2, 67891);
-            auto hashed_kmers2 = extract_and_hash_kmers_nthash(transcript.sequence, kmer_length2);
-            mks.sketch2 = createSketch_FracMinhash(hashed_kmers2, sketch_size);
-
+            // // auto hashed_kmers2 = extract_and_hash_kmers_murmur(transcript.sequence, kmer_length2, 67891);
+            // auto hashed_kmers2 = extract_and_hash_kmers_nthash(transcript.sequence, kmer_length2);
+            // mks.sketch2 = createSketch_FracMinhash(hashed_kmers2, sketch_size);
+            for (unsigned k : kmer_lengths) {
+                auto hashed_kmers = extract_and_hash_kmers_nthash(transcript.sequence, k);
+                mks.sketches[k] = createSketch_FracMinhash(hashed_kmers, sketch_size);
+            }
             transcript_sketches[id] = std::move(mks);
         }
 
@@ -144,19 +160,29 @@ int main(int argc, char* argv[]) {
         std::unordered_map<std::string, MultiKmerSketch> read_sketches;
         for (const auto& [id, read] : reads) {
             // 判断 read 长度是否同时满足两个 kmer 长度的要求
-            if (read.sequence.length() < kmer_length1 || read.sequence.length() < kmer_length2) {
-                continue; 
+            // if (read.sequence.length() < kmer_length1 || read.sequence.length() < kmer_length2) {
+            //     continue; 
+            // }
+            bool valid = true;
+            for (unsigned k : kmer_lengths) {
+                if (read.sequence.size() < k) {
+                    valid = false;
+                    break;
+                }
+            }
+            if (!valid) {
+                continue;
             }
 
             MultiKmerSketch mks;
             // 分别提取两个不同 kmer 长度的 kmer，并构建 sketch
             // auto hashed_kmers1 = extract_and_hash_kmers_murmur(read.sequence, kmer_length1, 67890);
-            auto hashed_kmers1 = extract_and_hash_kmers_nthash(read.sequence, kmer_length1);
-            mks.sketch1 = createSketch_FracMinhash(hashed_kmers1, sketch_size);
+            // auto hashed_kmers1 = extract_and_hash_kmers_nthash(read.sequence, kmer_length1);
+            // mks.sketch1 = createSketch_FracMinhash(hashed_kmers1, sketch_size);
 
-            // auto hashed_kmers2 = extract_and_hash_kmers_murmur(read.sequence, kmer_length2, 67891); 
-            auto hashed_kmers2 = extract_and_hash_kmers_nthash(read.sequence, kmer_length2);
-            mks.sketch2 = createSketch_FracMinhash(hashed_kmers2, sketch_size);
+            // // auto hashed_kmers2 = extract_and_hash_kmers_murmur(read.sequence, kmer_length2, 67891); 
+            // auto hashed_kmers2 = extract_and_hash_kmers_nthash(read.sequence, kmer_length2);
+            // mks.sketch2 = createSketch_FracMinhash(hashed_kmers2, sketch_size);
 
             // auto hash_results = extract_hashes_with_multikmer(
             //     read.sequence,
@@ -167,7 +193,10 @@ int main(int argc, char* argv[]) {
 
             // mks.sketch1 = createSketch_FracMinhash_vector(hash_results[kmer_length1], sketch_size);
             // mks.sketch2 = createSketch_FracMinhash_vector(hash_results[kmer_length2], sketch_size);
-
+            for (unsigned k : kmer_lengths) {
+                auto hashed_kmers = extract_and_hash_kmers_nthash(read.sequence, k);
+                mks.sketches[k] = createSketch_FracMinhash(hashed_kmers, sketch_size);
+            }
             read_sketches[id] = std::move(mks);
         }
 
@@ -185,7 +214,14 @@ int main(int argc, char* argv[]) {
 
         start = std::chrono::high_resolution_clock::now();
 
-        auto homologous_segments = sparse_chain(read_sketches, kmer_to_transcripts, transcripts, reads, kmer_length1, 0.3);
+        auto homologous_segments = sparse_chain(
+            read_sketches,         // 每个 read 对应的 MultiKmerSketch
+            kmer_to_transcripts,   // key 为 kmer length 的 mapping，包含每个 kmer length 的 kmer->transcript 关系
+            transcripts,           // transcript 数据
+            reads,                 // read 数据
+            kmer_lengths,          // 传入一个 vector，决定是单个还是多个 kmer length 模式
+            0.8                    // fraction 阈值
+        );
         
         std::cout << "Total number of successful matches: " << homologous_segments.size() << std::endl;
         std::cout<<"finish sparse chain"<<std::endl;
