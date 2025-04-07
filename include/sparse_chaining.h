@@ -6,45 +6,39 @@
 #include <cstdint>
 #include <unordered_map>
 #include <unordered_set>
-#include <vector>
 #include <string>
 #include "data_io.h"
 #include "kmer.h"
 #include "sketch.h"
 
-// 稀疏链比对函数声明
-
-// std::unordered_map<std::string, std::vector<std::pair<std::string, int>>> sparse_chain(
-//     const std::unordered_map<std::string, std::unordered_set<uint32_t>>& read_sketches,
-//     const std::unordered_map<uint32_t, std::vector<std::pair<std::string, const std::unordered_set<uint32_t>*>>>& kmer_to_transcripts,
-//     const std::unordered_map<std::string, Transcript>& transcripts,
-//     const std::unordered_map<std::string, Read>& reads,
-//     int kmer_length, double fraction) ;
-std::unordered_map<std::string, std::vector<std::pair<std::string, int>>>
-sparse_chain(
+/**
+ * @brief Perform sparse chaining for transcript-read matching.
+ *
+ * This function compares k-mer sketches of reads against precomputed transcript sketches to
+ * identify homologous transcript segments for each read. For each read, the function counts
+ * matching k-mers for each transcript across multiple k-mer lengths, applies a fractional
+ * threshold to filter out low-confidence matches, and returns a sorted list of candidate transcripts
+ * along with a final score.
+ *
+ * @param read_sketches An unordered_map mapping read IDs to their MultiKmerSketch.
+ * @param kmer_to_transcripts A mapping for each k-mer length. The outer key is the k-mer length,
+ *        and the inner map maps a k-mer hash value (uint32_t) to a vector of pairs. Each pair contains
+ *        a transcript ID (std::string) and a pointer to the corresponding sketch (std::unordered_set<uint32_t>*).
+ * @param transcripts An unordered_map mapping transcript IDs to Transcript structures.
+ * @param kmer_lengths A vector of k-mer lengths used to generate the sketches.
+ * @param fraction The fraction used to compute thresholds. For each k-mer length, only transcripts
+ *        with a match count above (fraction * max_count) in the current read are retained.
+ * @return std::unordered_map<std::string, std::vector<std::pair<std::string, int>>> A mapping from read IDs
+ *         to a vector of candidate transcripts. Each candidate is represented as a pair, where the first
+ *         element is the transcript ID and the second element is the final score.
+ */
+std::unordered_map<std::string, std::vector<std::pair<std::string, int>>> sparse_chain(
     const std::unordered_map<std::string, MultiKmerSketch>& read_sketches,
-    // 新的 mapping，key 为 kmer length
+    // New mapping: key is k-mer length.
     const std::unordered_map<unsigned, 
            std::unordered_map<uint32_t, std::vector<std::pair<std::string, const std::unordered_set<uint32_t>*>>>>& kmer_to_transcripts,
     const std::unordered_map<std::string, Transcript>& transcripts,
-    const std::unordered_map<std::string, Read>& reads,
     const std::vector<unsigned>& kmer_lengths, 
     double fraction);
-// std::unordered_map<std::string, std::vector<std::pair<std::string, int>>> sparse_chain(
-//     const std::unordered_map<std::string, MultiKmerSketch>& read_sketches,
-//     const std::pair<
-//         std::unordered_map<uint32_t, std::vector<std::pair<std::string, const std::unordered_set<uint32_t>*>>>,
-//         std::unordered_map<uint32_t, std::vector<std::pair<std::string, const std::unordered_set<uint32_t>*>>>
-//     >& kmer_to_transcripts_pair,
-//     const std::unordered_map<std::string, Transcript>& transcripts,
-//     const std::unordered_map<std::string, Read>& reads,
-//     int kmer_length, double fraction);
-// std::vector<std::string> find_best_match_orderedminhash(const std::string& read_id,
-//                                                         const std::unordered_map<std::string, Read>& reads,
-//                                                         const std::vector<std::string>& candidate_transcripts,
-//                                                         const std::unordered_map<std::string, Transcript>& transcripts,
-//                                                         int kmer_length, double fraction);
-// double compare_relative_positions(const std::vector<std::pair<uint32_t, size_t>>& read_minhash,
-//                                   const std::vector<std::pair<uint32_t, size_t>>& transcript_minhash);
-int edit_distance(const std::string& str1, const std::string& str2);
+
 #endif // SPARSE_CHAINING_H
