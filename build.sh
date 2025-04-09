@@ -36,18 +36,18 @@ $CXX $CXXFLAGS $SOURCES -L/usr/local/lib -lnthash -o $OUTPUT
 # Check whether the compilation was successful.
 if [ $? -eq 0 ]; then
     echo "Build successful. The executable is located at $OUTPUT_DIR/test"
-    echo "Running the program..."
+    # echo "Running the program..."
     
-    # Run the program in "index" mode:
-    # Mode: -o index, followed by reference genome FASTA file and the desired output index file.
-    $OUTPUT -o index "$PROJECT_ROOT/Test_Data/gencode.v45.transcripts.fa" "$PROJECT_ROOT/Test_Data/gencode_v45.index"
+    # # Run the program in "index" mode:
+    # # Mode: -o index, followed by reference genome FASTA file and the desired output index file.
+    # $OUTPUT -o index "$PROJECT_ROOT/Test_Data/gencode.v45.transcripts.fa" "$PROJECT_ROOT/Test_Data/gencode_v45.index"
     
-    # Run the program in "quant" mode:
-    # Mode: -o quant, followed by the index file, the FASTQ reads file, and the desired output CSV file.
-    $OUTPUT -o quant "$PROJECT_ROOT/Test_Data/gencode_v45.index" "$PROJECT_ROOT/Test_Data/sd_02_099.fastq" "$PROJECT_ROOT/output_0406_02_31_0.9frac.csv"
+    # # Run the program in "quant" mode:
+    # # Mode: -o quant, followed by the index file, the FASTQ reads file, and the desired output CSV file.
+    # $OUTPUT -o quant "$PROJECT_ROOT/Test_Data/gencode_v45.index" "$PROJECT_ROOT/Test_Data/sd_02_099.fastq" "$PROJECT_ROOT/output_0406_02_31_0.9frac.csv"
     
-    # Uncomment the following line if you want to run another quant mode with different parameters:
-    # $OUTPUT -o quant "$PROJECT_ROOT/Test_Data/gencode.v45.index" "$PROJECT_ROOT/Test_Data/sd_02_099.fastq" "$PROJECT_ROOT/output_0324_02_67_0.75frac.csv"
+    # # Uncomment the following line if you want to run another quant mode with different parameters:
+    # # $OUTPUT -o quant "$PROJECT_ROOT/Test_Data/gencode.v45.index" "$PROJECT_ROOT/Test_Data/sd_02_099.fastq" "$PROJECT_ROOT/output_0324_02_67_0.75frac.csv"
     
     # Check if the profiling output file (gmon.out) exists.
     if [ -f gmon.out ]; then
