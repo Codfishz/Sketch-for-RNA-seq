@@ -1,4 +1,4 @@
-```markdown
+
 # RNA-seq Isoform Quantification using Sketching and Sparse Chaining
 
 **RNA-seq Isoform Quantification** is a high-efficiency command-line tool designed to quantify gene isoforms from RNA-seq data. This tool leverages advanced sketching techniques, including fractional MinHash (FracMinhash), together with sparse chaining algorithms to improve the accuracy and speed of alignment and quantification tasks.
@@ -119,5 +119,4 @@ This layout helps you quickly understand the project's structure and locate the 
 
 - **nthash Library**: Thanks to the developers of nthash for providing a fast k-mer hashing solution.
 
-_Last updated on YYYY-MM-DD._
-```
+_Last updated on 2025-04-09._
