@@ -11,32 +11,32 @@ std::unordered_map<std::string, double> estimate_isoform_abundance_em(
     const std::unordered_map<std::string, Transcript>& transcripts,
     int max_iterations = 100, double convergence_threshold = 0.05) {
 
-    // 在函数内部：
+    // Inside the function:
 
-    // Uniform distribution 初始化
+    // Initialize with a uniform distribution
     std::unordered_map<std::string, double> pi;
     for (const auto& [transcript_id, _] : transcripts) {
         pi[transcript_id] = 1.0 / transcripts.size();
     }
 
-    // EM 主循环
+    // EM main loop
     for (int iteration = 0; iteration < max_iterations; ++iteration) {
-        std::unordered_map<std::string, double> posterior_sums;  // 恢复 double
+        std::unordered_map<std::string, double> posterior_sums;  // Accumulate posterior sums
         double total_change = 0.0;
 
-        const double probability_threshold = 1e-6;  // 低概率剪枝
-        const double epsilon = 1e-10;  // 避免除零
+        const double probability_threshold = 1e-6;  // Low probability pruning
+        const double epsilon = 1e-10;  // Avoid division by zero
 
         for (const auto& [read_id, candidates] : homologous_segments) {
             double denominator = 0.0;
-            std::vector<double> numerators(candidates.size()); // 预分配 vector，提高访问速度
+            std::vector<double> numerators(candidates.size()); // Pre-allocate vector for improved access speed
 
-            // **计算分母**（直接计算，不再缓存）
+            // Calculate denominator (direct computation, no caching)
             size_t idx = 0;
             for (const auto& [transcript_id, match_count] : candidates) {
                 double p_r_ti = static_cast<double>(match_count);
                 double value = pi[transcript_id] * p_r_ti;
-                numerators[idx++] = value;  // 存入 vector，避免额外查找
+                numerators[idx++] = value;  // Store into vector to avoid extra lookup
                 denominator += value;
             }
 
@@ -77,14 +77,14 @@ std::unordered_map<std::string, double> assign_reads_to_isoforms(
     for (const auto& [read_id, candidates] : homologous_segments) {
         double total_probability = 0.0;
 
-        // 计算分母：所有候选 transcript 的概率加权和
+        // Calculate the denominator: weighted sum of probabilities for all candidate transcripts
         for (const auto& [transcript_id, match_count] : candidates) {
             if (pi.find(transcript_id) != pi.end()) {
                 total_probability += pi.at(transcript_id) * match_count;
             }
         }
 
-        // 计算每个 transcript 的加权分配
+        // Calculate the weighted assignment for each transcript
         for (const auto& [transcript_id, match_count] : candidates) {
             if (pi.find(transcript_id) != pi.end() && total_probability > 0.0) {
                 double probability = (pi.at(transcript_id) * match_count) / total_probability;
